@@ -1,0 +1,4 @@
+interface:
+  display_name: "Photo Style Gallery"
+  short_description: "Apply recognizable, privacy-first photo styles"
+  default_prompt: "Use $photo-to-lineart-skill to preserve this photo's subject and apply the most suitable visual style, then report the parameters used."
