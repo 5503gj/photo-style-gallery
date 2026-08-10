@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.gradio/
+outputs/
+*.png
+*.jpg
+*.jpeg
+!examples/*.png
+!examples/*.jpg
+!examples/*.jpeg
+
