@@ -9,6 +9,7 @@
 - 支持大图自动缩放
 - Gradio 网站界面
 - 配套可复用 `photo-to-lineart-skill`
+- 内置本地风格 Agent：根据自然语言选择滤镜，并返回可解释的执行计划
 - 包含基础自动化测试和参数报告
 - [图片风格来源与实现目录](docs/image-style-catalog.md)
 
@@ -28,6 +29,7 @@ python app.py
 ```text
 app.py                         # Gradio 网站
 lineart_core.py                # 图像处理核心
+agent/style_agent.py           # 风格意图识别 + 本地滤镜工作流
 test_lineart.py                # 基础测试
 skills/photo-to-lineart-skill/ # 可复用 Skill
 ```
@@ -46,3 +48,13 @@ skills/photo-to-lineart-skill/ # 可复用 Skill
 4. 增加可选 AI 风格增强
 5. 部署到 Hugging Face Spaces
 6. 再评估微信小程序：小程序前端 + 图片处理后端
+
+## Agent 说明
+
+当前风格 Agent 是一个无数据库、无外部 API 的确定性工作流：
+
+```text
+自然语言需求 → 风格意图识别 → 选择本地 OpenCV 滤镜 → 生成图片 → 返回执行 Trace
+```
+
+它不会把图片上传到第三方，也不会把本地滤镜包装成生成式模型。后续若接入真正的图像模型，可以保留同一层 Agent 编排，再把 `process_image` 替换为受控的图片生成工具。

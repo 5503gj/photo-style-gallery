@@ -7,6 +7,7 @@ import os
 import gradio as gr
 from PIL import Image
 
+from agent.style_agent import run_style_agent
 from lineart_core import STYLE_NAMES, process_image
 
 
@@ -33,6 +34,16 @@ def transform(image: Image.Image, style: str, intensity: float, detail: float):
         return None, f"**处理失败**\n\n{exc}"
 
 
+def transform_with_agent(image: Image.Image, prompt: str, style: str, intensity: float, detail: float):
+    if image is None:
+        return None, "**还没有生成**\n\n请先上传一张 JPG 或 PNG 图片。", {}
+    try:
+        result, report, plan = run_style_agent(image, prompt, style, intensity, detail)
+        return result, report.to_markdown() + "\n\n**Agent 执行计划**\n" + " → ".join(plan["steps"]), plan
+    except Exception as exc:
+        return None, f"**处理失败**\n\n{exc}", {"error": str(exc)}
+
+
 with gr.Blocks(title="图片风格实验室", css=CSS, theme=gr.themes.Soft()) as demo:
     with gr.Column(elem_classes="app-shell"):
         gr.Markdown(
@@ -49,6 +60,11 @@ with gr.Blocks(title="图片风格实验室", css=CSS, theme=gr.themes.Soft()) a
                     value="极简保真",
                     label="视觉方案",
                 )
+                prompt = gr.Textbox(
+                    label="告诉 Agent 你想要的感觉（可选）",
+                    placeholder="例如：做成复古电影感，保留人物轮廓",
+                    lines=2,
+                )
                 gr.Markdown(
                     "**极简保真**：优先保留你的颜色、构图和主体细节；如果想要真正的线条效果，再选择“简约线条”。",
                     elem_classes="style-note",
@@ -56,12 +72,19 @@ with gr.Blocks(title="图片风格实验室", css=CSS, theme=gr.themes.Soft()) a
                 intensity = gr.Slider(0.0, 1.0, value=0.45, step=0.05, label="风格强度")
                 detail = gr.Slider(0.0, 1.0, value=0.60, step=0.05, label="细节保留")
                 run = gr.Button("应用风格", variant="primary")
+                agent_run = gr.Button("让风格 Agent 自动选择", variant="secondary")
                 gr.Markdown("建议上传 JPG 或 PNG；复杂背景可以选择“简约线条”并降低细节。", elem_classes="note")
             with gr.Column(elem_classes="panel"):
                 output_image = gr.Image(type="pil", label="处理结果", height=420)
                 report = gr.Markdown("处理参数会显示在这里。")
+                agent_trace = gr.JSON(label="Agent 执行记录", value={})
 
         run.click(transform, [input_image, style, intensity, detail], [output_image, report])
+        agent_run.click(
+            transform_with_agent,
+            [input_image, prompt, style, intensity, detail],
+            [output_image, report, agent_trace],
+        )
 
 
 if __name__ == "__main__":
