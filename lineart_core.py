@@ -80,6 +80,15 @@ def _resize_for_processing(image: Image.Image, max_side: int = 1600) -> Image.Im
     )
 
 
+def prepare_image(image: Image.Image, max_side: int = 1000) -> Image.Image:
+    """Shared bounded, oriented RGB source for previews and workflow tools."""
+    if not isinstance(image, Image.Image):
+        raise TypeError("image必须是Pillow图片")
+    if isinstance(max_side, bool) or not isinstance(max_side, int) or not 1 <= max_side <= MAX_OUTPUT_SIDE:
+        raise ValueError(f"max_side必须是1到{MAX_OUTPUT_SIDE}之间的整数")
+    return _resize_for_processing(image, max_side)
+
+
 def _rgb_array(image: Image.Image) -> np.ndarray:
     return np.asarray(image.convert("RGB"))
 

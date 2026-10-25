@@ -11,4 +11,6 @@ outputs/
 !examples/*.png
 !examples/*.jpg
 !examples/*.jpeg
+!assets/still-life.png
+node_modules/
 
