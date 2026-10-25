@@ -16,3 +16,5 @@ description: "维护 Photo Style Gallery 的风格导演、图像分析、多风
 5. 验证用 python -m pytest -q，覆盖轮廓/亮部回绕原反例、新的试片/导出边界及真实Gradio端到端。
 
 6. 界面验证原图与结果切换、键盘和减少动态效果；远程数据与缓存说明保持准确。
+
+在线版入口与构建见docs/ONLINE.md。浏览器和服务版本共用核心；修改后运行npm run test:online，保留以上在线能力边界，不把浏览器会话标成云端同步。

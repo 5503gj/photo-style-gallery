@@ -1,5 +1,15 @@
 # FORM · 影像风格工坊
 
+## 免安装在线体验
+
+**[打开FORM在线工坊](https://5503gj.github.io/photo-style-gallery/)** · [返回作品集](https://5503gj.github.io/personal-site/)
+
+浏览器Worker通过Pyodide 0.28.3实际运行原有lineart_core.py、image_input.py和style_director.py，使用NumPy/Pillow/OpenCV生成预览、三款试片、SVG与ZIP。
+
+首次加载约28MB引擎；资源随Pages托管。图片不上传，原图与结果保留在页面/Worker内存。关闭/清除释放，下载文件由用户保存。低内存设备可能较慢；非多租户云端队列。
+
+在线版由GitHub Actions先运行回归与真实浏览器测试，再部署GitHub Pages。发布与架构见[在线部署说明](docs/ONLINE.md)。
+
 一个可本地运行的图片处理网站：上传随手拍，应用线稿、胶片、海报和编辑感抽象等风格。
 
 ## 项目亮点
