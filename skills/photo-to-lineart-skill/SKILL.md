@@ -12,7 +12,7 @@ Use the repository's `lineart_core.py` as the source of truth for deterministic 
 1. Confirm that the user supplied an image or a local image path.
 2. Choose a style from the registry: `极简保真`, `简约线条`, `铅笔素描`, `黑白线稿`, `漫画轮廓`, `编辑感抽象`, `复古胶片`, or `高对比海报`.
 3. Start with intensity `0.65` and detail `0.60`; adjust one parameter at a time.
-4. For local files, run the web app or call `process_image` from `lineart_core.py`.
+4. For local files, decode with `image_input.load_upload` before calling `process_image` from `lineart_core.py`.
 5. Report the selected style, parameters, original size, output size, and output path.
 6. Never claim that an image was processed if the result was not generated and checked.
 
@@ -26,6 +26,8 @@ Use the repository's `lineart_core.py` as the source of truth for deterministic 
 - Use `高对比海报` for monochrome cover or poster concepts.
 - Do not overwrite the input file.
 - Reduce the maximum side of very large images to keep the demo responsive.
+- Inputs are JPEG/PNG up to 10 MiB and 12 million pixels. `max_side` is an integer 1–1600; intensity/detail are finite numbers in [0, 1]. Reject invalid parameters instead of silently clamping them.
+- A remote Gradio deployment uploads to that server and uses temporary cached files; explain this data flow instead of promising that files never leave the browser.
 - Explain that the current version is an image filter, not a trained generative model.
 - If AI restyling is requested, treat it as an optional future mode and preserve the original composition where possible.
 

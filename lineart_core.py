@@ -3,10 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+from numbers import Real
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
+
+MAX_INPUT_PIXELS = 12_000_000
+MAX_INPUT_SIDE = 16_000
+MAX_OUTPUT_SIDE = 1600
+
+
+def validate_size(size: tuple[int, int]) -> None:
+    width, height = size
+    if min(width, height) <= 0 or max(width, height) > MAX_INPUT_SIDE or width * height > MAX_INPUT_PIXELS:
+        raise ValueError("图片超过限制：最长边16000像素、总像素1200万")
+
+
+def _unit_parameter(name: str, value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real) or not 0 <= value <= 1 or not math.isfinite(value):
+        raise ValueError(f"{name}必须是0到1之间的有限数值")
+    return float(value)
 
 
 STYLE_DESCRIPTIONS = {
@@ -44,7 +62,14 @@ class ProcessingReport:
 
 
 def _resize_for_processing(image: Image.Image, max_side: int = 1600) -> Image.Image:
-    image = image.convert("RGB")
+    # Check the header before load/convert; also protect direct Python/Skill callers.
+    validate_size(image.size)
+    image = ImageOps.exif_transpose(image)
+    if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+        rgba = image.convert("RGBA")
+        image = Image.alpha_composite(Image.new("RGBA", rgba.size, "white"), rgba).convert("RGB")
+    else:
+        image = image.convert("RGB")
     width, height = image.size
     scale = min(1.0, max_side / max(width, height))
     if scale == 1.0:
@@ -100,17 +125,27 @@ def _minimal_lineart(gray: np.ndarray, intensity: float, detail: float) -> np.nd
     low = 65 + int((1 - detail) * 65)
     high = 165 + int((1 - detail) * 55)
     edges = cv2.Canny(smooth, low, high)
-    edges = cv2.morphologyEx(edges, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    # A 2x2 opening erases one-pixel Canny edges. Remove only tiny components.
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(edges, connectivity=8)
+    keep = np.zeros(count, dtype=np.uint8)
+    keep[1:] = (stats[1:, cv2.CC_STAT_AREA] >= max(3, int(14 - detail * 10))) * 255
+    edges = keep[labels]
     if intensity > 0.45:
         edges = cv2.dilate(edges, np.ones((2, 2), np.uint8), iterations=1)
     return 255 - edges
+
+
+def _quantize(rgb: np.ndarray, step: int) -> np.ndarray:
+    # Widen *before* adding the bin midpoint, otherwise uint8 wraps near white.
+    wide = rgb.astype(np.uint16)
+    return np.clip((wide // step) * step + step // 2, 0, 255).astype(np.uint8)
 
 
 def _minimal_fidelity(rgb: np.ndarray, intensity: float, detail: float) -> np.ndarray:
     """Keep the source photo recognizable while adding a restrained editorial finish."""
     smooth = cv2.bilateralFilter(rgb, 9, 35 + detail * 35, 35 + detail * 35)
     step = max(8, int(24 - detail * 10))
-    quantized = np.clip((smooth // step) * step + step // 2, 0, 255).astype(np.uint8)
+    quantized = _quantize(smooth, step)
     blend = 0.18 + intensity * 0.18
     result = rgb.astype(np.float32) * (1 - blend) + quantized.astype(np.float32) * blend
 
@@ -129,7 +164,7 @@ def _editorial_abstract(rgb: np.ndarray, intensity: float, detail: float) -> np.
     height, width = rgb.shape[:2]
     smooth = cv2.bilateralFilter(rgb, 9, 75, 75)
     step = max(16, int(64 - detail * 24))
-    quantized = np.clip((smooth // step) * step + step // 2, 0, 255).astype(np.uint8)
+    quantized = _quantize(smooth, step)
     block_w = max(1, width // int(18 - detail * 6))
     block_h = max(1, height // int(18 - detail * 6))
     small = cv2.resize(quantized, (block_w, block_h), interpolation=cv2.INTER_AREA)
@@ -145,8 +180,8 @@ def _retro_film(rgb: np.ndarray, intensity: float, detail: float) -> np.ndarray:
     """Apply a restrained warm grade, grain, and vignette."""
     height, width = rgb.shape[:2]
     result = rgb.astype(np.float32)
-    result[:, :, 0] *= 1.0 - 0.08 * intensity
-    result[:, :, 2] *= 1.0 + 0.08 * intensity
+    result[:, :, 0] *= 1.0 + 0.08 * intensity
+    result[:, :, 2] *= 1.0 - 0.08 * intensity
     result += 4.0 * intensity
 
     rng = np.random.default_rng(2026)
@@ -179,9 +214,14 @@ def process_image(
     """Convert a PIL image into one of the registered deterministic styles."""
     if image is None:
         raise ValueError("请先上传一张图片")
-
-    intensity = float(np.clip(intensity, 0.0, 1.0))
-    detail = float(np.clip(detail, 0.0, 1.0))
+    if not isinstance(image, Image.Image):
+        raise TypeError("image必须是Pillow图片")
+    if style not in STYLE_NAMES:
+        raise ValueError("未知风格")
+    intensity = _unit_parameter("强度", intensity)
+    detail = _unit_parameter("细节", detail)
+    if isinstance(max_side, bool) or not isinstance(max_side, int) or not 1 <= max_side <= MAX_OUTPUT_SIDE:
+        raise ValueError(f"max_side必须是1到{MAX_OUTPUT_SIDE}之间的整数")
     prepared = _resize_for_processing(image, max_side=max_side)
     rgb = _rgb_array(prepared)
     gray = _to_gray(rgb)
@@ -211,7 +251,7 @@ def process_image(
         style=style,
         intensity=intensity,
         detail=detail,
-        original_size=image.convert("RGB").size,
+        original_size=image.size,
         output_size=result.size,
     )
     return result, report
